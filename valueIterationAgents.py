@@ -168,6 +168,14 @@ class AsynchronousValueIterationAgent(ValueIterationAgent):
         """
         ValueIterationAgent.__init__(self, mdp, discount, iterations)
 
+    def getAllQVals(self, state):
+        actions = self.mdp.getPossibleActions(state)  # All possible actions from a state
+        qVals = util.Counter()  #  action: qValue pairs
+
+        for action in actions:
+            qVals[action] = self.computeQValueFromValues(state, action)
+        return qVals
+
     def runValueIteration(self):
         "*** YOUR CODE HERE ***"
         for i in range(self.iterations):
@@ -201,4 +209,39 @@ class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
 
     def runValueIteration(self):
         "*** YOUR CODE HERE ***"
+        priority_queue = util.PriorityQueue()
+        all_states_list = self.mdp.getStates()
+        predecessors = {}
+
+        for state in all_states_list:
+            predecessors[state] = set()
+
+        for state in all_states_list:
+            all_actions = self.mdp.getPossibleActions(state)
+            for action in all_actions:
+                possible_next_states = self.mdp.getTransitionStatesAndProbs(state, action)
+                for pos_state in possible_next_states:
+                    if pos_state[1] > 0:
+                        predecessors[pos_state[0]].add(state)
+
+        for state in all_states_list: 
+            all_q_values = self.getAllQVals(state)
+            if len(all_q_values) > 0:
+                max_q = all_q_values[all_q_values.argMax()]
+                diff = abs(self.values[state] - max_q)
+                priority_queue.push(state, -diff)
+
+        for i in range(self.iterations):
+            if priority_queue.isEmpty():
+                return None
+            state = priority_queue.pop()
+            all_q_values = self.getAllQVals(state)
+            max_q = all_q_values[all_q_values.argMax()]
+            self.values[state] = max_q
+            for pred_state in predecessors[state]:
+                pred_q_values = self.getAllQVals(pred_state)
+                max_q = pred_q_values[pred_q_values.argMax()]
+                diff = abs(self.values[pred_state] - max_q)
+                if diff > self.theta:
+                    priority_queue.update(pred_state, -diff)
 
